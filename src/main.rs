@@ -119,7 +119,8 @@ pub fn main() -> Result<(), String> {
 
 
     let texture_creator = canvas.texture_creator();
-    let sub_texture = texture_creator.load_texture("images/sub.png")?;
+    // let sub_texture = texture_creator.load_texture("images/sub.png")?;
+    let sub_texture = texture_creator.load_texture("images/sub-large.png")?;
 
     let pipe_texture = texture_creator.load_texture("images/pipe.png")?;
 
@@ -237,15 +238,6 @@ pub fn main() -> Result<(), String> {
         canvas.set_draw_color(Color::RGB(192, 192, 192));
         canvas.clear();
 
-        let surface = font
-            .render("Score: 0000")
-            .blended(Color::RGBA(64, 64, 64, 255))
-            .map_err(|e| e.to_string())?;
-        let texture = texture_creator
-            .create_texture_from_surface(&surface)
-            .map_err(|e| e.to_string())?;
-        canvas.copy(&texture, None, Rect::new(200, 10, 100, 20))?;
-
 
         // Print submarine
         let angle = match sub.velocity {
@@ -290,6 +282,15 @@ pub fn main() -> Result<(), String> {
                 bubbles[i] = generator.generate(ww as i32, wh as i32);
             }
         }
+
+        let surface = font
+            .render(format!("Score: {:08}", fc).as_str())
+            .blended(Color::RGBA(64, 64, 64, 255))
+            .map_err(|e| e.to_string())?;
+        let texture = texture_creator
+            .create_texture_from_surface(&surface)
+            .map_err(|e| e.to_string())?;
+        canvas.copy(&texture, None, Rect::new(200, 10, 100, 20))?;
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
