@@ -12,6 +12,7 @@ use rand::Rng;
 
 const MAX_BUBBLES: i32 = 10;
 
+#[derive(Debug)]
 struct Pipe {
     x: i32,
     top_offset: i32,
@@ -58,7 +59,6 @@ impl<'a> BubbleGenerator<'a> {
             rng.gen_range(0..w + 600) as f32,
             (h + rng.gen_range(10..100)) as f32,
             -3.0,
-            rng.gen_range(-3.0..-0.5),
             Rc::clone(&self.textures[texture_idx]),
         )
     }
@@ -68,17 +68,15 @@ impl<'a> BubbleGenerator<'a> {
 struct Bubble<'a> {
     x: f32,
     y: f32,
-    velocity_x: f32,
     velocity_y: f32,
     texture: Rc<Texture<'a>>,
 }
 
 impl<'a> Bubble<'a> {
-    fn new(x: f32, y: f32, velocity_x: f32, velocity_y: f32, texture: Rc<Texture<'a>>) -> Self {
+    fn new(x: f32, y: f32, velocity_y: f32, texture: Rc<Texture<'a>>) -> Self {
         Self {
             x,
             y,
-            velocity_x,
             velocity_y,
             texture,
         }
@@ -168,17 +166,16 @@ pub fn main() -> Result<(), String> {
             }
         }
 
+        // Generate the background
         canvas.set_draw_color(Color::RGB(192, 192, 192));
         canvas.clear();
 
-
+        // Print ground line
         let y = (wh - (wh / 3)) as i32;
-        canvas.set_draw_color(Color::RGB(64, 64, 64));
-        canvas.draw_line((0, y), (ww as i32, y))?;
-        // canvas.set_draw_color(Color::RGB(128, 128, 128));
-        // canvas.draw_rect(Rect::new(0, 0, ww, wh - 100))?;
+        canvas.set_draw_color(Color::RGB(164, 164, 164));
+        canvas.fill_rect(Rect::new(0, y, ww, (wh - y as u32)))?;
 
-
+        // Print message
         let surface = font
             .render("Press <space> to begin")
             .blended(Color::RGBA(128, 128, 128, 255))
@@ -189,36 +186,66 @@ pub fn main() -> Result<(), String> {
 
         canvas.copy(&texture, None, Rect::new((ww/2) as i32 - 200,(wh/2) as i32 - 30, 400, 60))?;
 
-
+        // Bob the little sub around
         angle += 0.04;
         angle %= 2.0 * std::f64::consts::PI;
-
-        let a = angle.sin() * 15.0;
+        let a = angle.sin() * 10.0;
         canvas.copy(&sub_texture, None, Rect::new(sub.x, sub.y + a as i32, 50, 45))?;
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 
+    let mut next_pipe_fc = 100;
     let mut fc = 0;
     while !game_over {
         fc += 1;
 
-        if fc % 100 == 0 {
+        // Generate new pipe if it's time for a new one
+        if fc > next_pipe_fc {
+            let mut rng = rand::thread_rng();
+            // next_pipe_fc = fc + rng.gen_range(20..40);
+            next_pipe_fc = fc + rng.gen_range(75..200);
+
+            // let hole_size = 200;
+            let hole_size = rng.gen_range(150..250);
+            let hole_offset = rng.gen_range(50..wh - hole_size - 50);
+
             pipes.push(Pipe{
                 x: 800,
-                top_offset: 0,
-                bottom_offset: 0,
+                top_offset: hole_offset as i32,
+                bottom_offset: (hole_offset + hole_size) as i32,
             })
         }
 
+        // Update the submarine
         let (_, wh) = canvas.window().size();
-
         if sub.y < wh as i32 {
             sub.velocity += sub.gravity;
             sub.y = sub.y + sub.velocity as i32;
         }
 
+        // Moved the pipes
+        for i in 0..pipes.len() {
+            pipes[i].x -= 3;
+        }
+
+        // Remove pipes that are off-screen
+        for i in (0..pipes.len()).rev() {
+            let q = pipe_texture.query();
+            let qw = (q.width / 10) as i32;
+
+            if pipes[i].x < -qw  {
+                pipes.remove(i);
+            }
+        }
+
+        // Check if the sub hit the top or bottom
+        if sub.y >= wh as i32 || sub.y < 0 {
+            game_over = true;
+        }
+
+        // Poll for events
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => {
@@ -231,46 +258,47 @@ pub fn main() -> Result<(), String> {
             }
         }
 
-        if sub.y >= wh as i32 || sub.y < 0 {
-            game_over = true;
-        }
 
+        // Draw background
         canvas.set_draw_color(Color::RGB(192, 192, 192));
         canvas.clear();
 
+        // Print sand line
+        // let y = (wh - (wh / 3)) as i32;
+        // canvas.set_draw_color(Color::RGB(64, 64, 64));
+        // canvas.draw_line((0, y), (ww as i32, y))?;
+        let y = (wh - (wh / 3)) as i32;
+        canvas.set_draw_color(Color::RGB(164, 164, 164));
+        canvas.fill_rect(Rect::new(0, y, ww, (wh - y as u32)))?;
+
 
         // Print submarine
-        let angle = match sub.velocity {
-            v if v < 0.0 => -15.0,
-            v if v > 0.0 => 15.0,
-            _ => 0.0,
-        };
-        canvas.copy_ex(&sub_texture, None, Rect::new(sub.x, sub.y, 50, 45), angle, None, false, false)?;
+        canvas.copy_ex(&sub_texture, None, Rect::new(sub.x, sub.y, 50, 45), sub.velocity as f64, None, false, false)?;
 
-
+        // Print pipes
         for i in 0..pipes.len() {
-            pipes[i].x -= 3;
-
             let q = pipe_texture.query();
-            let qh = (q.height / 5) as i32;
-            let qw = (q.width / 10) as i32;
+            let ph = q.height / 3;
 
-            canvas.copy_ex(&pipe_texture, None, Rect::new(pipes[i].x, 0, qw as u32, qh as u32), 0.0, None, false, true)?;
-            canvas.copy(&pipe_texture, None, Rect::new(pipes[i].x, (wh - qh as u32) as i32, qw as u32, qh as u32))?;
-        }
+            let qw = 50_u32;
 
-        let y = (wh - (wh / 3)) as i32;
-        canvas.set_draw_color(Color::RGB(64, 64, 64));
-        canvas.draw_line((0, y), (ww as i32, y))?;
+            // Top pipe
+            canvas.copy_ex(
+                &pipe_texture,
+                None,
+                Rect::new(pipes[i].x, 0, 50, pipes[i].top_offset as u32),
+                0.0,
+                None,
+                false,
+                true
+            )?;
 
-
-        for i in (0..pipes.len()).rev() {
-            let q = pipe_texture.query();
-            let qw = (q.width / 10) as i32;
-
-            if pipes[i].x < -qw  {
-                pipes.remove(i);
-            }
+            // Bottom pipe
+            canvas.copy(
+                &pipe_texture,
+                None,
+                Rect::new(pipes[i].x, pipes[i].bottom_offset, 50, q.height - pipes[i].bottom_offset as u32),
+            )?;
         }
 
         // Print bubbles
