@@ -10,7 +10,7 @@ use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, RenderTarget, WindowCanvas};
+use sdl2::render::WindowCanvas;
 use crate::background::Background;
 use crate::bubble::Bubbles;
 use crate::pipe::PipeGenerator;
@@ -18,6 +18,7 @@ use crate::sub::Sub;
 
 const MAX_BUBBLES: usize = 10;
 
+/// Game state
 struct GameState {
     /// True if the game has started. False if not started, or has ended
     game_started: bool,
@@ -27,18 +28,19 @@ struct GameState {
     fc: i64,
     /// Highest frame counter score encountered
     high_score: i64,
-    /// Canvas to draw on
-    canvas: WindowCanvas,
     /// Speed of the current game
     x_speed: i32,
+    // Current window height
+    window_height: u32,
+    // Current window width
+    window_width: u32,
 }
 
 /// A renderable is something that can be rendered onto screen and has its own update functionality
-trait Renderable<T: RenderTarget> {
-    fn render(&self, state: &GameState, canvas: &mut Canvas<T>) -> Result<(), String>;
+trait Renderable {
+    fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String>;
     fn update(&mut self, state: &GameState);
 }
-
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
@@ -51,23 +53,21 @@ pub fn main() -> Result<(), String> {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-
-    // let texture_creator = canvas.texture_creator();
-    // let axolotl_texture = texture_creator.load_texture("images/axolotl.png")?;
-
     let mut state = GameState {
         game_started: false,
         game_over: false,
         fc: 0,
-        highscore: 0,
-        canvas,
+        high_score: 0,
         x_speed: 10,
+        window_height: canvas.window().size().0,
+        window_width: canvas.window().size().1,
     };
 
-    let mut background = Background::new(&state.canvas);
-    let mut sub = Sub::new(&state.canvas, 100, 100);
-    let mut bubbles = Bubbles::new(&state.canvas, MAX_BUBBLES);
-    let mut pipes = PipeGenerator::new(&state.canvas);
+    // Create all renderables for the game
+    let mut background = Background::new(&canvas);
+    let mut sub = Sub::new(&canvas, 100, 100);
+    let mut bubbles = Bubbles::new(&canvas, MAX_BUBBLES);
+    let mut pipes = PipeGenerator::new(&canvas);
 
     let mut first_run = true;
 
@@ -75,15 +75,15 @@ pub fn main() -> Result<(), String> {
         let mut event_pump = sdl_context.event_pump()?;
 
         // Do pregame
-        do_pregame(&mut state, first_run, &mut event_pump, &mut background, &mut sub, &mut bubbles)?;
+        do_pregame(&mut state, &mut canvas, first_run, &mut event_pump, &mut background, &mut sub, &mut bubbles)?;
         first_run = false;
 
         // run a game
-        do_game(&mut state, &mut event_pump, &mut background, &mut sub, &mut bubbles, &mut pipes)?;
+        do_game(&mut state, &mut canvas, &mut event_pump, &mut background, &mut sub, &mut bubbles, &mut pipes)?;
 
         // Update score and reinitialize game
-        if state.fc > state.highscore {
-            state.highscore = state.fc;
+        if state.fc > state.high_score {
+            state.high_score = state.fc;
         }
 
         state.fc = 0;
@@ -93,8 +93,8 @@ pub fn main() -> Result<(), String> {
 }
 
 // Returns Ok(true) when the game can begin. Returns ok(false) when we want to quit
-fn do_pregame(state: &mut GameState, first_run: bool, event_pump: &mut sdl2::EventPump, background: &mut Background, sub: &mut Sub, bubbles: &mut Bubbles) -> Result<bool, String> {
-
+fn do_pregame(state: &mut GameState, canvas: &mut WindowCanvas, first_run: bool, event_pump: &mut sdl2::EventPump, background: &mut Background, sub: &mut Sub, bubbles: &mut Bubbles) -> Result<bool, String> {
+    // Create font
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string())?;
     let mut font = ttf_context.load_font("images/Lato-Regular.ttf", 128)?;
     font.set_style(sdl2::ttf::FontStyle::BOLD);
@@ -114,10 +114,9 @@ fn do_pregame(state: &mut GameState, first_run: bool, event_pump: &mut sdl2::Eve
         }
 
         // Render stuff
-        let _ = background.render(&state, &mut state.canvas);
-        let _ = sub.render(&state, &mut state.canvas);
-        let _ = bubbles.render(&state, &mut state.canvas);
-
+        let _ = background.render(&state, canvas);
+        let _ = sub.render(&state, canvas);
+        let _ = bubbles.render(&state, canvas);
 
         // Print message
         let s = if first_run { "Press <space> to begin" } else { "You sunk. Press <space> to try again" };
@@ -127,19 +126,32 @@ fn do_pregame(state: &mut GameState, first_run: bool, event_pump: &mut sdl2::Eve
             .blended(Color::RGBA(128, 128, 128, 255))
             .map_err(|e| e.to_string())?;
 
-        let texture = state.canvas.texture_creator()
+        let texture = canvas.texture_creator()
             .create_texture_from_surface(&surface)
             .map_err(|e| e.to_string())?;
-        state.canvas.copy(&texture, None, Rect::new(300, 300, 400, 60))?;
+        canvas.copy(&texture, None, Rect::new(300, 300, 400, 60))?;
 
-        state.canvas.present();
+        canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }
 
-fn do_game(state: &mut GameState, event_pump: &mut sdl2::EventPump, background: &mut Background, sub: &mut Sub, bubbles: &mut Bubbles, pipes: &mut PipeGenerator) -> Result<bool, String> {
+fn do_game(state: &mut GameState, canvas: &mut WindowCanvas, event_pump: &mut sdl2::EventPump, background: &mut Background, sub: &mut Sub, bubbles: &mut Bubbles, pipes: &mut PipeGenerator) -> Result<bool, String> {
     while !state.game_over {
         state.fc += 1;
+
+        // Poll for events
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => {
+                    state.game_over = true;
+                }
+                Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
+                    sub.velocity = sub.jump_strength;
+                }
+                _ => {}
+            }
+        }
 
         pipes.update(state);
         background.update(state);
@@ -150,6 +162,15 @@ fn do_game(state: &mut GameState, event_pump: &mut sdl2::EventPump, background: 
             state.game_over = true;
             return Ok(true)
         }
+
+        // Draw everything
+        let _ = background.render(&state, canvas);
+        let _ = sub.render(&state, canvas);
+        let _ = bubbles.render(&state, canvas);
+        let _ = pipes.render(&state, canvas);
+
+        canvas.present();
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 
     // // Generate new pipe if it's time for a new one
@@ -177,26 +198,6 @@ fn do_game(state: &mut GameState, event_pump: &mut sdl2::EventPump, background: 
     // if sub.y >= wh as i32 || sub.y < 0 {
     //     state.game_over = true;
     // }
-
-    // Poll for events
-    for event in event_pump.poll_iter() {
-        match event {
-            Event::Quit { .. } => {
-                state.game_over = true;
-            }
-            Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
-                sub.velocity = sub.jump_strength;
-            }
-            _ => {}
-        }
-    }
-
-    // Draw everything
-    let _ = background.render(&state, &mut state.canvas);
-    let _ = sub.render(&state, &mut state.canvas);
-    let _ = bubbles.render(&state, &mut state.canvas);
-    let _ = pipes.render(&state, &mut state.canvas);
-
     Ok(true)
 }
 
@@ -254,24 +255,6 @@ fn collision_detected(_sub: &Sub, _pipes: &PipeGenerator) -> bool {
             game_over = true;
         }
 
-        // Poll for events
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } => {
-                    game_over = true;
-                }
-                Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
-                    sub.velocity = sub.jump_strength;
-                }
-                _ => {}
-            }
-        }
-
-
-        draw_background(&mut canvas, ww, wh);
-
-        // Print submarine
-        canvas.copy_ex(&sub_texture, None, Rect::new(sub.x, sub.y, 50, 45), sub.velocity as f64, None, false, false)?;
 
         // Print pipes
         for i in 0..pipes.len() {
@@ -313,39 +296,7 @@ fn collision_detected(_sub: &Sub, _pipes: &PipeGenerator) -> bool {
             )?;
         }
 
-        draw_bubbles(&mut canvas, &mut bubbles, ww as i32, wh as i32, &generator, -2.0);
 
-        let surface = font
-            .render(format!("Score: {:06}   Hi-Score: {:06}", fc, high_score).as_str())
-            .blended(Color::RGBA(64, 64, 64, 255))
-            .map_err(|e| e.to_string())?;
-        let texture = texture_creator
-            .create_texture_from_surface(&surface)
-            .map_err(|e| e.to_string())?;
-        canvas.copy(&texture, None, Rect::new(20, 10, 300, 30))?;
-
-        canvas.present();
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 
  */
-// fn draw_background(canvas: &mut WindowCanvas, ww: u32, wh: u32) {
-//     canvas.set_draw_color(Color::RGB(192, 192, 192));
-//     canvas.clear();
-//
-//     // Print ground line
-//     let y = (wh - (wh / 3)) as i32;
-//     canvas.set_draw_color(Color::RGB(164, 164, 164));
-//     canvas.fill_rect(Rect::new(0, y, ww, wh - y as u32));
-// }
-
-// fn draw_bubbles<'a>(canvas: &mut WindowCanvas, bubbles: &mut Vec<Bubble<'a>>, ww: i32, wh: i32, bubble_generator: &'a BubbleGenerator<'a>, speed: f32) {
-//     for i in 0..bubbles.len() {
-//         bubbles[i].update(speed);
-//         bubbles[i].render(canvas);
-//
-//         if bubbles[i].finished() {
-//             bubbles[i] = bubble_generator.generate(ww, wh);
-//         }
-//     }
-// }

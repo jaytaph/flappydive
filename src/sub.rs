@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use sdl2::image::LoadTexture;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, WindowCanvas};
+use sdl2::render::{Texture, WindowCanvas};
 use crate::{GameState, Renderable};
 
 
@@ -33,12 +33,14 @@ impl<'a> Sub<'a> {
     }
 }
 
-impl<'a, T> Renderable<T> for Sub<'a> {
-    fn render(&self, _state: &GameState, canvas: &mut Canvas<T>) {
+impl<'a> Renderable for Sub<'a> {
+    fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
         let q = self.texture.query();
 
         let y = self.y + (self.angle.sin() * 10.0) as i32;
         let _ = canvas.copy(&self.texture, None, Rect::new(self.x, y, q.width, q.height));
+
+        Ok(())
     }
 
     fn update(&mut self, state: &GameState) {
@@ -59,9 +61,8 @@ impl<'a, T> Renderable<T> for Sub<'a> {
             self.velocity += self.gravity;
             self.y += self.velocity as i32;
 
-            let (_, wh) = state.canvas.output_size().unwrap();
-            if self.y > wh as i32 {
-                self.y = wh as i32;
+            if self.y > state.window_height as i32 {
+                self.y = state.window_height as i32;
                 self.velocity = 0.0;
             }
         }

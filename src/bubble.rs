@@ -2,7 +2,7 @@ use std::rc::Rc;
 use rand::Rng;
 use sdl2::rect::Rect;
 use sdl2::image::LoadTexture;
-use sdl2::render::{Canvas, Texture, WindowCanvas};
+use sdl2::render::{Texture, WindowCanvas};
 use crate::{GameState, Renderable};
 
 /// Single bubble
@@ -61,8 +61,8 @@ impl<'a> Bubbles<'a> {
     }
 }
 
-impl<'a, T> Renderable<T> for Bubbles<'a> {
-    fn render(&self, state: &GameState, canvas: &mut Canvas<T>) -> Result<(), String> {
+impl<'a> Renderable for Bubbles<'a> {
+    fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
         for bubble in self.bubbles.iter() {
             bubble.render(state, canvas);
         }
@@ -73,10 +73,8 @@ impl<'a, T> Renderable<T> for Bubbles<'a> {
     fn update(&mut self, state: &GameState) {
         self.bubbles.retain(|bubble| !bubble.finished());
 
-        let (w, h) = state.canvas.output_size().unwrap();
-
         if self.bubbles.len() < self.max_bubbles {
-            self.bubbles.push(self.generator.generate(w as i32, h as i32));
+            self.bubbles.push(self.generator.generate(state.window_width as i32, state.window_height as i32));
         }
 
         for bubble in self.bubbles.iter_mut() {
@@ -85,10 +83,12 @@ impl<'a, T> Renderable<T> for Bubbles<'a> {
     }
 }
 
-impl<'a, T> Renderable<T> for Bubble<'a> {
-    fn render(&self, _state: &GameState, canvas: &mut Canvas<T>) {
+impl<'a> Renderable for Bubble<'a> {
+    fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
         let q = self.texture.query();
         let _ = canvas.copy(&self.texture, None, Rect::new(self.x as i32, self.y as i32, q.width, q.height));
+
+        Ok(())
     }
 
     fn update(&mut self, state: &GameState) {

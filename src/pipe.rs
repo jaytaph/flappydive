@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use sdl2::image::LoadTexture;
-use sdl2::render::{Canvas, Texture, WindowCanvas};
+use sdl2::render::{Texture, WindowCanvas};
 use crate::{GameState, Renderable};
 
 struct Pipe {
@@ -45,8 +45,8 @@ impl<'a> PipeGenerator<'a> {
     }
 }
 
-impl<'a, T> Renderable<T> for PipeGenerator<'a> {
-    fn render(&self, _state: &GameState, _canvas: &mut Canvas<T>) -> Result<(), String> {
+impl<'a> Renderable for PipeGenerator<'a> {
+    fn render(&self, _state: &GameState, _canvas: &mut WindowCanvas) -> Result<(), String> {
         todo!()
         // render each pipe
     }

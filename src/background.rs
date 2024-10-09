@@ -3,7 +3,7 @@ use rand::Rng;
 use sdl2::image::LoadTexture;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, WindowCanvas};
+use sdl2::render::{Texture, WindowCanvas};
 use sdl2::ttf::Font;
 use crate::{GameState, Renderable};
 
@@ -17,27 +17,32 @@ pub struct Background<'a> {
     objects: Vec<BackgroundObject<'a>>,
     new_object_at_fc: i64,
     font: Font<'a, 'static>,
+    textures: Vec<Rc<Texture<'a>>>,
 }
 
 impl<'a> Background<'a> {
-    pub fn new(_canvas: &WindowCanvas) -> Self {
+    pub fn new(canvas: &WindowCanvas) -> Self {
         let mut rng = rand::thread_rng();
 
         let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
         let mut font = ttf_context.load_font("images/Lato-Regular.ttf", 128).unwrap();
         font.set_style(sdl2::ttf::FontStyle::BOLD);
 
+        let texture_creator = canvas.texture_creator();
+        let texture = Rc::new(texture_creator.load_texture("images/axolotl.png").unwrap());
+
         Self {
             objects: Vec::new(),
             new_object_at_fc: rng.gen_range(0..100),
             font,
+            textures: vec![texture],
         }
     }
 }
 
-impl<'a, T> Renderable<T> for Background<'a> {
-    fn render(&self, state: &GameState, canvas: &mut Canvas<T>) {
-        let (ww, wh) = canvas.window().size()?;
+impl<'a> Renderable for Background<'a> {
+    fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
+        let (ww, wh) = canvas.window().size();
 
         canvas.set_draw_color(Color::RGB(192, 192, 192));
         canvas.clear();
@@ -45,17 +50,21 @@ impl<'a, T> Renderable<T> for Background<'a> {
         // Print ground line
         let y = wh - (wh / 3);
         canvas.set_draw_color(Color::RGB(164, 164, 164));
-        canvas.fill_rect(Rect::new(0, y, ww, wh - y as u32))?;
+        canvas.fill_rect(Rect::new(0, y as i32, ww, wh - y))?;
 
         // Print score
         let surface = self.font
-            .render(format!("Score: {:06}   Hi-Score: {:06}", state.fc, state.highscore).as_str())
+            .render(format!("Score: {:06}   Hi-Score: {:06}", state.fc, state.high_score).as_str())
             .blended(Color::RGBA(64, 64, 64, 255))
             .map_err(|e| e.to_string())?;
+
         let texture = canvas.texture_creator()
             .create_texture_from_surface(&surface)
             .map_err(|e| e.to_string())?;
+
         canvas.copy(&texture, None, Rect::new(20, 10, 300, 30))?;
+
+        Ok(())
     }
 
     fn update(&mut self, state: &GameState) {
@@ -65,9 +74,7 @@ impl<'a, T> Renderable<T> for Background<'a> {
             let x = 800;
             let y = rng.gen_range(0..400);
 
-            let texture_creator = state.canvas.texture_creator();
-            let texture = Rc::new(texture_creator.load_texture("images/axolotl.png").unwrap());
-            self.objects.push(BackgroundObject { x, y, texture });
+            self.objects.push(BackgroundObject { x, y, texture: self.textures[0].clone() });
 
             self.new_object_at_fc = state.fc + rng.gen_range(50..300);
         }
