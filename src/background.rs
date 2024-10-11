@@ -1,41 +1,61 @@
-use std::rc::Rc;
 use rand::Rng;
 use sdl2::image::LoadTexture;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Texture, WindowCanvas};
-use sdl2::ttf::Font;
-use crate::{GameState, Renderable};
+use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::video::WindowContext;
+use crate::{GameState, Renderable, TTF};
+use crate::theme::THEME;
 
-pub struct BackgroundObject<'a> {
+#[allow(dead_code)]
+pub struct BackgroundObject {
     x: i32,
     y: i32,
-    texture: Rc<Texture<'a>>,
+    texture_idx: usize,
+}
+
+impl BackgroundObject {
+    pub fn new(x: i32, y: i32, texture_idx: usize) -> Self {
+        Self { x, y, texture_idx }
+    }
+
+    pub fn update(&mut self, x_speed: i32) {
+        self.x -= x_speed;
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.x < -100
+    }
 }
 
 pub struct Background<'a> {
-    objects: Vec<BackgroundObject<'a>>,
+    objects: Vec<BackgroundObject>,
     new_object_at_fc: i64,
-    font: Font<'a, 'static>,
-    textures: Vec<Rc<Texture<'a>>>,
+    textures: Vec<Texture<'a>>,
+    ttf: &'a TTF<'a>,
+    sand_highlights: Vec<(i32, i32)>
 }
 
 impl<'a> Background<'a> {
-    pub fn new(canvas: &WindowCanvas) -> Self {
+    pub fn new(_canvas: &WindowCanvas, ttf: &'a TTF, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
         let mut rng = rand::thread_rng();
 
-        let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
-        let mut font = ttf_context.load_font("images/Lato-Regular.ttf", 128).unwrap();
-        font.set_style(sdl2::ttf::FontStyle::BOLD);
+        let mut texture_axolotl = texture_creator.load_texture("images/axolotl.png").unwrap();
+        texture_axolotl.set_color_mod(THEME.fauna_color_1.0, THEME.fauna_color_1.1, THEME.fauna_color_1.2);
+        let textures = vec![texture_axolotl];
 
-        let texture_creator = canvas.texture_creator();
-        let texture = Rc::new(texture_creator.load_texture("images/axolotl.png").unwrap());
+        // Small darker pixels in the sand
+        let mut sand_highlights = vec![];
+        for i in 0..100 {
+            sand_highlights.push((rng.gen_range(0..800), rng.gen_range(400..600)));
+        }
 
         Self {
             objects: Vec::new(),
             new_object_at_fc: rng.gen_range(0..100),
-            font,
-            textures: vec![texture],
+            textures,
+            ttf,
+            sand_highlights
         }
     }
 }
@@ -44,47 +64,75 @@ impl<'a> Renderable for Background<'a> {
     fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
         let (ww, wh) = canvas.window().size();
 
-        canvas.set_draw_color(Color::RGB(192, 192, 192));
+        canvas.set_draw_color(Color::RGB(THEME.water.0, THEME.water.1, THEME.water.2));
         canvas.clear();
 
         // Print ground line
         let y = wh - (wh / 3);
-        canvas.set_draw_color(Color::RGB(164, 164, 164));
+        canvas.set_draw_color(Color::RGB(THEME.sand.0, THEME.sand.1, THEME.sand.2));
         canvas.fill_rect(Rect::new(0, y as i32, ww, wh - y))?;
 
+        // Print sand highlights
+        for (x, y) in &self.sand_highlights {
+            canvas.set_draw_color(Color::RGB(THEME.sand_highlight.0, THEME.sand_highlight.1, THEME.sand_highlight.2));
+            canvas.fill_rect(Rect::new(*x, *y, 2, 2))?;
+        }
+
         // Print score
-        let surface = self.font
+        let surface = self.ttf.font
             .render(format!("Score: {:06}   Hi-Score: {:06}", state.fc, state.high_score).as_str())
-            .blended(Color::RGBA(64, 64, 64, 255))
+            .blended(Color::RGBA(THEME.text.0, THEME.text.1, THEME.text.2, 255))
             .map_err(|e| e.to_string())?;
 
-        let texture = canvas.texture_creator()
+        let creator = canvas.texture_creator();
+        let texture = creator
             .create_texture_from_surface(&surface)
             .map_err(|e| e.to_string())?;
 
         canvas.copy(&texture, None, Rect::new(20, 10, 300, 30))?;
 
+        // Render all objects
+        for obj in &self.objects {
+            let texture = &self.textures[obj.texture_idx];
+            let q = texture.query();
+            let rect = Rect::new(obj.x, obj.y, q.width, q.height);
+            canvas.copy(texture, None, rect)?;
+        }
+
         Ok(())
     }
 
     fn update(&mut self, state: &GameState) {
+        // Update sand highlights and reset them if they go off-screen
+        for (x, y) in &mut self.sand_highlights {
+            *x -= state.x_speed;
+            if *x < 0 {
+                *x = 800;
+                *y = rand::thread_rng().gen_range(400..600);
+            }
+        }
+
         // Maybe add some other background elements here, sand, rocks, shipwreck, axolotl, etc.
         if state.fc >= self.new_object_at_fc {
             let mut rng = rand::thread_rng();
-            let x = 800;
-            let y = rng.gen_range(0..400);
 
-            self.objects.push(BackgroundObject { x, y, texture: self.textures[0].clone() });
+            let obj = BackgroundObject::new(
+                800,
+                rng.gen_range(450..550),
+                rng.gen_range(0..self.textures.len())
+            );
+
+            self.objects.push(obj);
 
             self.new_object_at_fc = state.fc + rng.gen_range(50..300);
         }
 
         // Any objects are moved here
         for obj in &mut self.objects {
-            obj.x -= state.x_speed;
+            obj.update(state.x_speed);
         }
 
         // Remove objects that are off-screen
-        self.objects.retain(|obj| obj.x + obj.texture.query().width as i32 > 0);
+        self.objects.retain(|obj| !obj.is_finished());
     }
 }

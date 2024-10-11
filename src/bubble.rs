@@ -1,124 +1,111 @@
-use std::rc::Rc;
 use rand::Rng;
 use sdl2::rect::Rect;
 use sdl2::image::LoadTexture;
-use sdl2::render::{Texture, WindowCanvas};
+use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::video::WindowContext;
 use crate::{GameState, Renderable};
+use crate::theme::THEME;
 
 /// Single bubble
-struct Bubble<'a> {
+struct Bubble {
     x: f32,
     y: f32,
+    max_y: f32,
     velocity_y: f32,
-    texture: Rc<Texture<'a>>,
+    texture_idx: usize,
 }
 
-impl<'a> Bubble<'a> {
-    fn new(x: f32, y: f32, velocity_y: f32, texture: Rc<Texture<'a>>) -> Self {
+impl Bubble {
+    fn new(x: f32, y: f32, max_y: f32, velocity_y: f32, texture_idx: usize) -> Self {
         Self {
             x,
             y,
             velocity_y,
-            texture,
+            max_y,
+            texture_idx,
         }
     }
 
     fn finished(&self) -> bool {
-        self.y < 0.0 || self.x < 0.0
+        self.y < self.max_y || self.x < 0.0
+    }
+
+    fn update(&mut self, speed: f32) {
+        self.x -= speed;
+        self.y += self.velocity_y;
     }
 }
 
 /// Bubbles is a collection of Bubble objects that are generated, rendered and updated
 pub struct Bubbles<'a> {
-    bubbles: Vec<Bubble<'a>>,
-    generator: BubbleGenerator<'a>,
+    bubbles: Vec<Bubble>,
     max_bubbles: usize,
+    textures: Vec<Texture<'a>>,
 }
 
 impl<'a> Bubbles<'a> {
-    pub fn new(canvas: &WindowCanvas, max_bubbles: usize) -> Self {
-        let texture_creator = canvas.texture_creator();
+    pub fn new(max_bubbles: usize, texture_creator: &'a TextureCreator<WindowContext>, w: u32, h: u32) -> Self {
+        let mut b_sm_texture = texture_creator.load_texture("images/bubble-sm.png").unwrap();
+        let mut b_md_texture = texture_creator.load_texture("images/bubble-md.png").unwrap();
+        let mut b_lg_texture = texture_creator.load_texture("images/bubble-lg.png").unwrap();
 
-        let b_sm_texture = Rc::new(texture_creator.load_texture("images/bubble-sm.png").unwrap());
-        let b_md_texture = Rc::new(texture_creator.load_texture("images/bubble-md.png").unwrap());
-        let b_lg_texture = Rc::new(texture_creator.load_texture("images/bubble-lg.png").unwrap());
+        b_sm_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
+        b_md_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
+        b_lg_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
 
         let textures = vec![b_sm_texture, b_md_texture, b_lg_texture];
 
         let mut bubbles = Self{
             bubbles: Vec::new(),
-            generator: BubbleGenerator::new(textures),
             max_bubbles,
+            textures,
         };
 
-        let (w, h) = canvas.output_size().unwrap();
-
         for _ in 0..max_bubbles {
-            bubbles.bubbles.push(bubbles.generator.generate(w as i32, h as i32));
+            bubbles.bubbles.push(bubbles.generate(w as i32, h as i32));
         }
 
         bubbles
     }
-}
-
-impl<'a> Renderable for Bubbles<'a> {
-    fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
-        for bubble in self.bubbles.iter() {
-            bubble.render(state, canvas);
-        }
-
-        Ok(())
-    }
-
-    fn update(&mut self, state: &GameState) {
-        self.bubbles.retain(|bubble| !bubble.finished());
-
-        if self.bubbles.len() < self.max_bubbles {
-            self.bubbles.push(self.generator.generate(state.window_width as i32, state.window_height as i32));
-        }
-
-        for bubble in self.bubbles.iter_mut() {
-            bubble.update(&state);
-        }
-    }
-}
-
-impl<'a> Renderable for Bubble<'a> {
-    fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
-        let q = self.texture.query();
-        let _ = canvas.copy(&self.texture, None, Rect::new(self.x as i32, self.y as i32, q.width, q.height));
-
-        Ok(())
-    }
-
-    fn update(&mut self, state: &GameState) {
-        self.x += state.x_speed as f32;
-        self.y += self.velocity_y;
-    }
-}
-
-
-/// Generator that can generate a new bubble
-struct BubbleGenerator<'a> {
-    textures: Vec<Rc<Texture<'a>>>,
-}
-
-impl<'a> BubbleGenerator<'a> {
-    fn new(textures: Vec<Rc<Texture<'a>>>) -> Self {
-        Self {
-            textures,
-        }
-    }
 
     fn generate(&self, w: i32, h: i32) -> Bubble {
         let mut rng = rand::thread_rng();
+
+        let x = rng.gen_range(0..(w + 300));
+        let y = h as f32;
+
+        // Maximum height of the bubble before it pops. If less than screen, than cap to top of screen (about -20)
+        let mut max_y = rng.gen_range(-200..(y / 2.0) as i32);
+        if max_y < -20 {
+            max_y = -20;
+        }
+        let velocity_y = rng.gen_range(-3.0..-0.5);
         let texture_idx = rng.gen_range(0..self.textures.len());
 
-        Bubble::new(
-            rng.gen_range(0..w + 600) as f32,
-            (h + rng.gen_range(10..100)) as f32,
-            -3.0,
-            Rc::clone(&self.textures[texture_idx]),
-        )
+        Bubble::new(x as f32, y, max_y as f32, velocity_y, texture_idx)
+    }
+}
+
+impl<'a> Renderable for Bubbles<'a> {
+    fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
+        for bubble in self.bubbles.iter() {
+            let q = &self.textures[bubble.texture_idx].query();
+            canvas.copy(&self.textures[bubble.texture_idx], None, Rect::new(bubble.x as i32, bubble.y as i32, q.width, q.height))?;
+        }
+
+        Ok(())
+    }
+
+    fn update(&mut self, state: &GameState) {
+        if self.bubbles.len() < self.max_bubbles {
+            let bubble = self.generate(state.window_width as i32, state.window_height as i32);
+            self.bubbles.push(bubble);
+        }
+
+        for bubble in self.bubbles.iter_mut() {
+            bubble.update(state.x_speed as f32);
+        }
+
+        self.bubbles.retain(|bubble| !bubble.finished());
     }
 }

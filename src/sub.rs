@@ -1,7 +1,8 @@
 use std::rc::Rc;
 use sdl2::image::LoadTexture;
 use sdl2::rect::Rect;
-use sdl2::render::{Texture, WindowCanvas};
+use sdl2::render::{Texture, TextureCreator, WindowCanvas};
+use sdl2::video::WindowContext;
 use crate::{GameState, Renderable};
 
 
@@ -17,8 +18,7 @@ pub struct Sub<'a> {
 }
 
 impl<'a> Sub<'a> {
-    pub fn new(canvas: &WindowCanvas, x: i32, y: i32) -> Self {
-        let texture_creator = canvas.texture_creator();
+    pub fn new(x: i32, y: i32, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
         let texture = Rc::new(texture_creator.load_texture("images/sub-large.png").unwrap());
 
         Sub {
@@ -35,12 +35,9 @@ impl<'a> Sub<'a> {
 
 impl<'a> Renderable for Sub<'a> {
     fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
-        let q = self.texture.query();
-
         let y = self.y + (self.angle.sin() * 10.0) as i32;
-        let _ = canvas.copy(&self.texture, None, Rect::new(self.x, y, q.width, q.height));
 
-        Ok(())
+        canvas.copy_ex(&self.texture, None, Rect::new(self.x, y, 50, 45), self.velocity as f64, None, false, false)
     }
 
     fn update(&mut self, state: &GameState) {
@@ -51,15 +48,22 @@ impl<'a> Renderable for Sub<'a> {
         }
 
         if state.game_over {
-            // dead
+            // dead, upside down
+            self.angle = 180.0;
         }
 
         if state.game_started && !state.game_over {
             self.angle = 0.0;
-            // alive
 
             self.velocity += self.gravity;
             self.y += self.velocity as i32;
+
+            if self.velocity < -10.0 {
+                self.velocity = -10.0;
+            }
+            if self.velocity > 10.0 {
+                self.velocity = 10.0;
+            }
 
             if self.y > state.window_height as i32 {
                 self.y = state.window_height as i32;
