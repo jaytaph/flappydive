@@ -7,6 +7,8 @@ use crate::theme::Theme;
 
 /// Submarine drawable object
 pub struct Sub<'a> {
+    initial_x: i32,
+    initial_y: i32,
     x: i32,
     y: i32,
     angle: f32,
@@ -21,6 +23,8 @@ impl<'a> Sub<'a> {
         let texture = texture_creator.load_texture("images/sub-large.png").unwrap();
 
         Sub {
+            initial_x: x,
+            initial_y: y,
             x,
             y,
             angle: 0.0,
@@ -73,5 +77,12 @@ impl<'a> Renderable for Sub<'a> {
 
     fn switch_theme(&mut self, theme: &Theme) {
         self.texture.set_color_mod(theme.sub.0, theme.sub.1, theme.sub.2);
+    }
+
+    fn reset(&mut self) {
+        self.x = self.initial_x;
+        self.y = self.initial_y;
+        self.angle = 0.0;
+        self.velocity = 0.0;
     }
 }

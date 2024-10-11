@@ -4,7 +4,7 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
-use crate::{GameState, Renderable, TTF};
+use crate::{GameState, Renderable};
 use crate::theme::Theme;
 
 #[allow(dead_code)]
@@ -32,12 +32,11 @@ pub struct Background<'a> {
     objects: Vec<BackgroundObject>,
     new_object_at_fc: i64,
     textures: Vec<Texture<'a>>,
-    ttf: &'a TTF<'a>,
     sand_highlights: Vec<(i32, i32)>
 }
 
 impl<'a> Background<'a> {
-    pub fn new(state: &GameState, ttf: &'a TTF, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
+    pub fn new(state: &GameState, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
         let mut rng = rand::thread_rng();
 
         let theme = state.theme.current();
@@ -56,7 +55,6 @@ impl<'a> Background<'a> {
             objects: Vec::new(),
             new_object_at_fc: rng.gen_range(0..100),
             textures,
-            ttf,
             sand_highlights
         }
     }
@@ -80,19 +78,6 @@ impl<'a> Renderable for Background<'a> {
             canvas.set_draw_color(Color::RGB(theme.sand_highlight.0, theme.sand_highlight.1, theme.sand_highlight.2));
             canvas.fill_rect(Rect::new(*x, *y, 2, 2))?;
         }
-
-        // Print score
-        let surface = self.ttf.font
-            .render(format!("Score: {:06}   Hi-Score: {:06}", state.fc, state.high_score).as_str())
-            .blended(Color::RGBA(theme.text.0, theme.text.1, theme.text.2, 255))
-            .map_err(|e| e.to_string())?;
-
-        let creator = canvas.texture_creator();
-        let texture = creator
-            .create_texture_from_surface(&surface)
-            .map_err(|e| e.to_string())?;
-
-        canvas.copy(&texture, None, Rect::new(20, 10, 300, 30))?;
 
         // Render all objects
         for obj in &self.objects {
@@ -143,5 +128,9 @@ impl<'a> Renderable for Background<'a> {
         for texture in self.textures.iter_mut() {
             texture.set_color_mod(theme.fauna_color_1.0, theme.fauna_color_1.1, theme.fauna_color_1.2);
         }
+    }
+
+    fn reset(&mut self) {
+        // No need to reset
     }
 }

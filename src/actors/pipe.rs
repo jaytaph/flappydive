@@ -134,4 +134,9 @@ impl<'a> Renderable for Pipes<'a> {
         self.pipe_texture.set_color_mod(theme.pipes.0, theme.pipes.1, theme.pipes.2);
         self.pipe_end_texture.set_color_mod(theme.pipes.0, theme.pipes.1, theme.pipes.2);
     }
+
+    fn reset(&mut self) {
+        self.pipes.clear();
+        self.next_pipe_at = 0;
+    }
 }

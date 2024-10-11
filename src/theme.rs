@@ -7,7 +7,7 @@ pub struct Theme {
     pub water: Color,               // Water / ocean color
     pub pipes: Color,               // Color of the pipes
     pub bubbles: Color,             // Color of the water bubbles
-    pub text: Color,                // Text on the screen
+    pub   text: Color,                // Text on the screen
     pub sub: Color,                 // Submarine color
 
     pub fauna_color_1: Color,

@@ -109,4 +109,8 @@ impl<'a> Renderable for Bubbles<'a> {
             texture.set_color_mod(theme.bubbles.0, theme.bubbles.1, theme.bubbles.2);
         }
     }
+
+    fn reset(&mut self) {
+        // No need to do anything. Bubbles will flow
+    }
 }
