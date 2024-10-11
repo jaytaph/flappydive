@@ -1,20 +1,20 @@
 type Color = (u8, u8, u8);
 
+#[allow(dead_code)]
 pub struct Theme {
-    pub sand: Color,
-    pub sand_highlight: Color,
-    pub water: Color,
-    pub pipes: Color,
-    pub bubbles: Color,
-    pub text: Color,
+    pub sand: Color,                // Sand color at the bottom
+    pub sand_highlight: Color,      // Highlighted sand color
+    pub water: Color,               // Water / ocean color
+    pub pipes: Color,               // Color of the pipes
+    pub bubbles: Color,             // Color of the water bubbles
+    pub text: Color,                // Text on the screen
+    pub sub: Color,                 // Submarine color
 
     pub fauna_color_1: Color,
     pub fauna_color_2: Color,
     pub fauna_color_3: Color,
     pub fauna_color_4: Color,
 }
-
-pub const MAX_BUBBLES: usize = 15;
 
 pub const COLOR_THEME: Theme = Theme {
     sand: (244, 214, 164),
@@ -24,6 +24,7 @@ pub const COLOR_THEME: Theme = Theme {
     bubbles: (136, 207, 241),
 
     text: (116, 100, 076),
+    sub: (128, 128, 255),
 
     fauna_color_1: (242, 140, 140),
     fauna_color_2: (42, 123, 79),
@@ -39,6 +40,7 @@ pub const GRAYSCALE_THEME: Theme = Theme {
     bubbles: (196, 196, 196),       // Grayscale of (136, 207, 241)
 
     text: (104, 104, 104),          // Grayscale of (116, 100, 76)
+    sub: (128, 128, 128),
 
     fauna_color_1: (161, 161, 161), // Grayscale of (242, 140, 140)
     fauna_color_2: (93, 93, 93),    // Grayscale of (42, 123, 79)
@@ -54,6 +56,7 @@ pub const THEME: Theme = Theme {
     bubbles: (171, 222, 239),       // Soft pale blue for bubbles
 
     text: (89, 80, 66),             // Warm brown for readable text
+    sub: (128, 128, 255),
 
     fauna_color_1: (243, 156, 18),  // Bright orange for coral/creatures
     fauna_color_2: (39, 174, 96),   // Bold green for plants
@@ -69,9 +72,33 @@ pub const THEME_2: Theme = Theme {
     bubbles: (156, 209, 247),       // Light blue for bubbles
 
     text: (70, 63, 55),             // Deep taupe for readable text
+    sub: (128, 128, 255),
 
     fauna_color_1: (255, 87, 51),   // Bright, bold red-orange for fauna
     fauna_color_2: (46, 204, 113),  // Fresh spring green for plants
     fauna_color_3: (240, 147, 43),  // Warm amber orange for coral/fauna
     fauna_color_4: (128, 90, 213),  // Bold violet for fauna or shells
 };
+
+pub struct ThemeSwitcher {
+    current_theme_idx: usize,
+    themes: Vec<Theme>,
+}
+
+impl ThemeSwitcher {
+    pub(crate) fn new() -> Self {
+        Self {
+            current_theme_idx: 0,
+            themes: vec![COLOR_THEME, GRAYSCALE_THEME, THEME, THEME_2],
+        }
+    }
+
+    pub(crate) fn next(&mut self) -> &Theme {
+        self.current_theme_idx = (self.current_theme_idx + 1) % self.themes.len();
+        &self.themes[self.current_theme_idx]
+    }
+
+    pub(crate) fn current(&self) -> &Theme {
+        &self.themes[self.current_theme_idx]
+    }
+}

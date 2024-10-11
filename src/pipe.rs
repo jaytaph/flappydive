@@ -1,11 +1,10 @@
-use std::rc::Rc;
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
 use crate::{GameState, Renderable};
 use rand::Rng;
 use sdl2::rect::Rect;
-use crate::theme::THEME;
+use crate::theme::{Theme, THEME};
 
 struct Pipe {
     x: i32,
@@ -32,8 +31,8 @@ impl Pipe {
 }
 
 pub struct Pipes<'a> {
-    pipe_texture: Rc<Texture<'a>>,
-    pipe_end_texture: Rc<Texture<'a>>,
+    pipe_texture: Texture<'a>,
+    pipe_end_texture: Texture<'a>,
     pipes: Vec<Pipe>,
     next_pipe_at: i64,
 }
@@ -48,8 +47,8 @@ impl<'a> Pipes<'a> {
 
 
         Self {
-            pipe_texture: Rc::new(pipe_texture),
-            pipe_end_texture: Rc::new(pipe_end_texture),
+            pipe_texture: pipe_texture,
+            pipe_end_texture: pipe_end_texture,
             pipes: Vec::new(),
             next_pipe_at: 0,
         }
@@ -129,5 +128,10 @@ impl<'a> Renderable for Pipes<'a> {
 
         // Remove pipes that are off-screen
         self.pipes.retain(|pipe| !pipe.finished());
+    }
+
+    fn switch_theme(&mut self, theme: &Theme) {
+        self.pipe_texture.set_color_mod(theme.pipes.0, theme.pipes.1, theme.pipes.2);
+        self.pipe_end_texture.set_color_mod(theme.pipes.0, theme.pipes.1, theme.pipes.2);
     }
 }

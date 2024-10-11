@@ -5,7 +5,7 @@ use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
 use crate::{GameState, Renderable, TTF};
-use crate::theme::THEME;
+use crate::theme::Theme;
 
 #[allow(dead_code)]
 pub struct BackgroundObject {
@@ -37,16 +37,18 @@ pub struct Background<'a> {
 }
 
 impl<'a> Background<'a> {
-    pub fn new(_canvas: &WindowCanvas, ttf: &'a TTF, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
+    pub fn new(state: &GameState, ttf: &'a TTF, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
         let mut rng = rand::thread_rng();
 
+        let theme = state.theme.current();
+
         let mut texture_axolotl = texture_creator.load_texture("images/axolotl.png").unwrap();
-        texture_axolotl.set_color_mod(THEME.fauna_color_1.0, THEME.fauna_color_1.1, THEME.fauna_color_1.2);
+        texture_axolotl.set_color_mod(theme.fauna_color_1.0, theme.fauna_color_1.1, theme.fauna_color_1.2);
         let textures = vec![texture_axolotl];
 
         // Small darker pixels in the sand
         let mut sand_highlights = vec![];
-        for i in 0..100 {
+        for _ in 0..100 {
             sand_highlights.push((rng.gen_range(0..800), rng.gen_range(400..600)));
         }
 
@@ -62,26 +64,27 @@ impl<'a> Background<'a> {
 
 impl<'a> Renderable for Background<'a> {
     fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
+        let theme = state.theme.current();
         let (ww, wh) = canvas.window().size();
 
-        canvas.set_draw_color(Color::RGB(THEME.water.0, THEME.water.1, THEME.water.2));
+        canvas.set_draw_color(Color::RGB(theme.water.0, theme.water.1, theme.water.2));
         canvas.clear();
 
         // Print ground line
         let y = wh - (wh / 3);
-        canvas.set_draw_color(Color::RGB(THEME.sand.0, THEME.sand.1, THEME.sand.2));
+        canvas.set_draw_color(Color::RGB(theme.sand.0, theme.sand.1, theme.sand.2));
         canvas.fill_rect(Rect::new(0, y as i32, ww, wh - y))?;
 
         // Print sand highlights
         for (x, y) in &self.sand_highlights {
-            canvas.set_draw_color(Color::RGB(THEME.sand_highlight.0, THEME.sand_highlight.1, THEME.sand_highlight.2));
+            canvas.set_draw_color(Color::RGB(theme.sand_highlight.0, theme.sand_highlight.1, theme.sand_highlight.2));
             canvas.fill_rect(Rect::new(*x, *y, 2, 2))?;
         }
 
         // Print score
         let surface = self.ttf.font
             .render(format!("Score: {:06}   Hi-Score: {:06}", state.fc, state.high_score).as_str())
-            .blended(Color::RGBA(THEME.text.0, THEME.text.1, THEME.text.2, 255))
+            .blended(Color::RGBA(theme.text.0, theme.text.1, theme.text.2, 255))
             .map_err(|e| e.to_string())?;
 
         let creator = canvas.texture_creator();
@@ -134,5 +137,11 @@ impl<'a> Renderable for Background<'a> {
 
         // Remove objects that are off-screen
         self.objects.retain(|obj| !obj.is_finished());
+    }
+
+    fn switch_theme(&mut self, theme: &Theme) {
+        for texture in self.textures.iter_mut() {
+            texture.set_color_mod(theme.fauna_color_1.0, theme.fauna_color_1.1, theme.fauna_color_1.2);
+        }
     }
 }

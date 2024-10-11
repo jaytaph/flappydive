@@ -6,6 +6,7 @@ mod theme;
 
 extern crate sdl2;
 
+use std::process::exit;
 use std::time::Duration;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
@@ -17,7 +18,11 @@ use crate::background::Background;
 use crate::bubble::Bubbles;
 use crate::pipe::Pipes;
 use crate::sub::Sub;
-use crate::theme::{MAX_BUBBLES, THEME};
+use crate::theme::{Theme, ThemeSwitcher};
+
+// Number of bubbles on the screen at one time
+pub const MAX_BUBBLES: usize = 15;
+
 
 /// Game state
 struct GameState {
@@ -35,12 +40,15 @@ struct GameState {
     window_height: u32,
     // Current window width
     window_width: u32,
+    // Theme switcher
+    theme: ThemeSwitcher,
 }
 
 /// A renderable is something that can be rendered onto screen and has its own update functionality
 trait Renderable {
     fn render(&self, state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String>;
     fn update(&mut self, state: &GameState);
+    fn switch_theme(&mut self, theme: &Theme);
 }
 
 pub struct TTF<'a> {
@@ -83,13 +91,21 @@ pub fn main() -> Result<(), String> {
         x_speed: 3,
         window_height: h,
         window_width: w,
+        theme: ThemeSwitcher::new(),
     };
 
     // Create all renderables for the game
-    let mut background = Background::new(&canvas, &ttf, &texture_creator);
+    let mut background = Background::new(&state, &ttf, &texture_creator);
     let mut sub = Sub::new(100, 100, &texture_creator);
     let mut bubbles = Bubbles::new(MAX_BUBBLES, &texture_creator, w, h);
     let mut pipes = Pipes::new(&texture_creator);
+
+    // Initial theme switch to correct all colors
+    background.switch_theme(&state.theme.current());
+    sub.switch_theme(&state.theme.current());
+    bubbles.switch_theme(&state.theme.current());
+    pipes.switch_theme(&state.theme.current());
+
 
     let mut first_run = true;
     loop {
@@ -115,12 +131,14 @@ pub fn main() -> Result<(), String> {
 
 // Returns Ok(true) when the game can begin. Returns ok(false) when we want to quit
 fn do_pregame(state: &mut GameState, canvas: &mut WindowCanvas, ttf: &TTF, first_run: bool, event_pump: &mut sdl2::EventPump, background: &mut Background, sub: &mut Sub, bubbles: &mut Bubbles) -> Result<bool, String> {
+    let theme = state.theme.current();
+
     // Create message texture
     let s = if first_run { "Press <space> to begin" } else { "You sunk. Press <space> to try again" };
 
     let surface = ttf.font
         .render(s)
-        .blended(Color::RGBA(THEME.text.0, THEME.text.1, THEME.text.2, 255))
+        .blended(Color::RGBA(theme.text.0, theme.text.1, theme.text.2, 255))
         .map_err(|e| e.to_string())?;
 
     let texture_creator = canvas.texture_creator();
@@ -132,11 +150,18 @@ fn do_pregame(state: &mut GameState, canvas: &mut WindowCanvas, ttf: &TTF, first
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => {
-                    return Ok(false);
+                    exit(0);
                 }
                 Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
                     state.game_started = true;
                     return Ok(true);
+                }
+                Event::KeyDown { keycode: Some(Keycode::T), .. } => {
+                    state.theme.next();
+
+                    background.switch_theme(&state.theme.current());
+                    sub.switch_theme(&state.theme.current());
+                    bubbles.switch_theme(&state.theme.current());
                 }
                 _ => {}
             }
@@ -161,10 +186,18 @@ fn do_game(state: &mut GameState, canvas: &mut WindowCanvas, event_pump: &mut sd
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => {
-                    state.game_over = true;
+                    exit(0);
                 }
                 Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
                     sub.velocity = sub.jump_strength;
+                }
+                Event::KeyDown { keycode: Some(Keycode::T), .. } => {
+                    state.theme.next();
+
+                    background.switch_theme(&state.theme.current());
+                    sub.switch_theme(&state.theme.current());
+                    bubbles.switch_theme(&state.theme.current());
+                    pipes.switch_theme(&state.theme.current());
                 }
                 _ => {}
             }

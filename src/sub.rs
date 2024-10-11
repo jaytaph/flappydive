@@ -1,10 +1,9 @@
-use std::rc::Rc;
 use sdl2::image::LoadTexture;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
 use crate::{GameState, Renderable};
-
+use crate::theme::Theme;
 
 /// Submarine drawable object
 pub struct Sub<'a> {
@@ -14,12 +13,12 @@ pub struct Sub<'a> {
     pub velocity: f32,
     gravity: f32,
     pub jump_strength: f32,
-    texture: Rc<Texture<'a>>,
+    texture: Texture<'a>,
 }
 
 impl<'a> Sub<'a> {
     pub fn new(x: i32, y: i32, texture_creator: &'a TextureCreator<WindowContext>) -> Self {
-        let texture = Rc::new(texture_creator.load_texture("images/sub-large.png").unwrap());
+        let texture = texture_creator.load_texture("images/sub-large.png").unwrap();
 
         Sub {
             x,
@@ -70,5 +69,9 @@ impl<'a> Renderable for Sub<'a> {
                 self.velocity = 0.0;
             }
         }
+    }
+
+    fn switch_theme(&mut self, theme: &Theme) {
+        self.texture.set_color_mod(theme.sub.0, theme.sub.1, theme.sub.2);
     }
 }

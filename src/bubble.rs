@@ -4,7 +4,7 @@ use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
 use crate::{GameState, Renderable};
-use crate::theme::THEME;
+use crate::theme::Theme;
 
 /// Single bubble
 struct Bubble {
@@ -45,14 +45,9 @@ pub struct Bubbles<'a> {
 
 impl<'a> Bubbles<'a> {
     pub fn new(max_bubbles: usize, texture_creator: &'a TextureCreator<WindowContext>, w: u32, h: u32) -> Self {
-        let mut b_sm_texture = texture_creator.load_texture("images/bubble-sm.png").unwrap();
-        let mut b_md_texture = texture_creator.load_texture("images/bubble-md.png").unwrap();
-        let mut b_lg_texture = texture_creator.load_texture("images/bubble-lg.png").unwrap();
-
-        b_sm_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
-        b_md_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
-        b_lg_texture.set_color_mod(THEME.bubbles.0, THEME.bubbles.1, THEME.bubbles.2);
-
+        let b_sm_texture = texture_creator.load_texture("images/bubble-sm.png").unwrap();
+        let b_md_texture = texture_creator.load_texture("images/bubble-md.png").unwrap();
+        let b_lg_texture = texture_creator.load_texture("images/bubble-lg.png").unwrap();
         let textures = vec![b_sm_texture, b_md_texture, b_lg_texture];
 
         let mut bubbles = Self{
@@ -107,5 +102,11 @@ impl<'a> Renderable for Bubbles<'a> {
         }
 
         self.bubbles.retain(|bubble| !bubble.finished());
+    }
+
+    fn switch_theme(&mut self, theme: &Theme) {
+        for texture in self.textures.iter_mut() {
+            texture.set_color_mod(theme.bubbles.0, theme.bubbles.1, theme.bubbles.2);
+        }
     }
 }
