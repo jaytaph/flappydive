@@ -1,8 +1,9 @@
 use sdl2::image::LoadTexture;
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
-use crate::{GameState, Renderable};
+use crate::{Collidable, GameState, Renderable};
 use crate::theme::Theme;
 
 /// Submarine drawable object
@@ -40,7 +41,15 @@ impl<'a> Renderable for Sub<'a> {
     fn render(&self, _state: &GameState, canvas: &mut WindowCanvas) -> Result<(), String> {
         let y = self.y + (self.angle.sin() * 10.0) as i32;
 
-        canvas.copy_ex(&self.texture, None, Rect::new(self.x, y, 50, 45), self.velocity as f64, None, false, false)
+        canvas.copy_ex(&self.texture, None, Rect::new(self.x, y, 50, 45), self.velocity as f64, None, false, false)?;
+
+        // // Draw bounding box
+        // canvas.set_draw_color(Color::RED);
+        // for bb in self.get_bounding_boxes() {
+        //     canvas.draw_rect(bb)?;
+        // }
+
+        Ok(())
     }
 
     fn update(&mut self, state: &GameState) {
@@ -84,5 +93,13 @@ impl<'a> Renderable for Sub<'a> {
         self.y = self.initial_y;
         self.angle = 0.0;
         self.velocity = 0.0;
+    }
+}
+
+impl<'a> Collidable for Sub<'a> {
+    fn get_bounding_boxes(&self) -> Vec<Rect> {
+        let y = self.y + (self.angle.sin() * 10.0) as i32;
+
+        vec![Rect::new(self.x, y, 50, 45)]
     }
 }

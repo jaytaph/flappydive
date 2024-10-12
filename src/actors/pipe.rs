@@ -1,8 +1,9 @@
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
-use crate::{GameState, Renderable};
+use crate::{Collidable, GameState, Renderable};
 use rand::Rng;
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use crate::theme::{Theme, THEME};
 
@@ -85,7 +86,7 @@ impl<'a> Renderable for Pipes<'a> {
             canvas.copy_ex(
                 &self.pipe_end_texture,
                 None,
-                Rect::new(pipe.x - 12, pipe.top_offset - 10, qe.width - 10, qe.height - 10),
+                Rect::new(pipe.x - 7, pipe.top_offset - 10, qe.width - 20, qe.height - 10),
                 0.0,
                 None,
                 false,
@@ -102,9 +103,15 @@ impl<'a> Renderable for Pipes<'a> {
             canvas.copy(
                 &self.pipe_end_texture,
                 None,
-                Rect::new(pipe.x - 13, pipe.bottom_offset, qe.width - 10, qe.height - 10),
+                Rect::new(pipe.x - 7, pipe.bottom_offset, qe.width - 20, qe.height - 10),
             )?;
         }
+
+        // // Draw bounding boxes
+        // canvas.set_draw_color(Color::RED);
+        // for bb in self.get_bounding_boxes() {
+        //     canvas.draw_rect(bb)?;
+        // }
 
         Ok(())
     }
@@ -138,5 +145,19 @@ impl<'a> Renderable for Pipes<'a> {
     fn reset(&mut self) {
         self.pipes.clear();
         self.next_pipe_at = 0;
+    }
+}
+
+impl<'a> Collidable for Pipes<'a> {
+    fn get_bounding_boxes(&self) -> Vec<Rect> {
+        let mut boxes = vec![];
+
+        for pipe in &self.pipes {
+            boxes.push(Rect::new(pipe.x - 5, 0, 60, pipe.top_offset as u32 + 20));
+            boxes.push(Rect::new(pipe.x - 5, pipe.bottom_offset,60, 600));
+
+        }
+
+        boxes
     }
 }

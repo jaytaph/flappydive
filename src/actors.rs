@@ -12,12 +12,12 @@ pub mod pipe;
 pub mod score;
 pub mod sub;
 
-struct Actors<'a> {
-    sub: Sub<'a>,
-    bubbles: Bubbles<'a>,
-    pipes: Pipes<'a>,
-    background: Background<'a>,
-    score: Score<'a>
+pub struct Actors<'a> {
+    pub sub: Sub<'a>,
+    pub bubbles: Bubbles<'a>,
+    pub pipes: Pipes<'a>,
+    pub background: Background<'a>,
+    pub score: Score<'a>
 }
 
 impl<'a> Actors<'a> {

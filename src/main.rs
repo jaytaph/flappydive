@@ -11,6 +11,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::ttf::Sdl2TtfContext;
+use crate::actors::Actors;
 use crate::actors::background::Background;
 use crate::actors::bubble::Bubbles;
 use crate::actors::pipe::Pipes;
@@ -21,40 +22,6 @@ use crate::theme::{Theme, ThemeSwitcher};
 // Number of bubbles on the screen at one time
 pub const MAX_BUBBLES: usize = 15;
 
-
-struct Actors<'a> {
-    sub: Sub<'a>,
-    bubbles: Bubbles<'a>,
-    pipes: Pipes<'a>,
-    background: Background<'a>,
-    score: Score<'a>
-}
-
-impl<'a> Actors<'a> {
-    pub(crate) fn switch_theme(&mut self, theme: &&Theme) {
-        self.background.switch_theme(theme);
-        self.sub.switch_theme(theme);
-        self.bubbles.switch_theme(theme);
-        self.pipes.switch_theme(theme);
-        self.score.switch_theme(theme);
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.background.reset();
-        self.sub.reset();
-        self.bubbles.reset();
-        self.pipes.reset();
-        self.score.reset();
-    }
-
-    pub(crate) fn update(&mut self, state: &GameState) {
-        self.background.update(state);
-        self.sub.update(state);
-        self.bubbles.update(state);
-        self.pipes.update(state);
-        self.score.update(state);
-    }
-}
 
 /// Game state
 struct GameState {
@@ -76,6 +43,11 @@ struct GameState {
     theme: ThemeSwitcher,
     // Runcount
     run_count: i32
+}
+
+/// A collidable can return bounding boxes which can be used for collision detection
+trait Collidable {
+    fn get_bounding_boxes(&self) -> Vec<Rect>;
 }
 
 /// A renderable is something that can be rendered onto screen and has its own update functionality
@@ -142,13 +114,13 @@ pub fn main() -> Result<(), String> {
         score: Score::new(&ttf)
     };
 
+    // we need to switch theme so all actors can find / set the correct colors
     actors.switch_theme(&state.theme.current());
-
 
     loop {
         let mut event_pump = sdl_context.event_pump()?;
 
-        // Do pregame
+        // Do pregame / title screen
         do_pregame(&mut state, &mut canvas, &ttf, &mut event_pump, &mut actors)?;
 
         actors.reset();
@@ -171,7 +143,6 @@ pub fn main() -> Result<(), String> {
 // Returns Ok(true) when the game can begin. Returns ok(false) when we want to quit
 fn do_pregame(state: &mut GameState, canvas: &mut WindowCanvas, ttf: &TTF, event_pump: &mut sdl2::EventPump, actors: &mut Actors) -> Result<bool, String> {
     let theme = state.theme.current();
-
 
     actors.sub.reset();
 
@@ -201,9 +172,7 @@ fn do_pregame(state: &mut GameState, canvas: &mut WindowCanvas, ttf: &TTF, event
                 Event::KeyDown { keycode: Some(Keycode::T), .. } => {
                     state.theme.next();
 
-                    actors.background.switch_theme(&state.theme.current());
-                    actors.sub.switch_theme(&state.theme.current());
-                    actors.bubbles.switch_theme(&state.theme.current());
+                    actors.switch_theme(&state.theme.current());
                 }
                 _ => {}
             }
@@ -271,6 +240,16 @@ fn do_game(state: &mut GameState, canvas: &mut WindowCanvas, event_pump: &mut sd
 }
 
 /// Returns true if the submarines collided against a pipe (or the ground / surface)
-fn collision_detected(_sub: &Sub, _pipes: &Pipes) -> bool {
+fn collision_detected(sub: &Sub, pipes: &Pipes) -> bool {
+    let binding = sub.get_bounding_boxes();
+    let bb = binding.first().unwrap();
+
+    let pipes_bb = pipes.get_bounding_boxes();
+    for pipe in pipes_bb {
+        if bb.has_intersection(pipe) {
+            return true;
+        }
+    }
+
     false
 }
